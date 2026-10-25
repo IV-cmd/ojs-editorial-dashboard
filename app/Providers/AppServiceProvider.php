@@ -5,8 +5,8 @@ namespace App\Providers;
 use App\Services\Ojs\HttpOjsClient;
 use App\Services\Ojs\MockOjsClient;
 use App\Services\Ojs\OjsClientInterface;
-use InvalidArgumentException;
 use Illuminate\Support\ServiceProvider;
+use InvalidArgumentException;
 
 class AppServiceProvider extends ServiceProvider
 {
