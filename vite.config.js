@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite';
+import { defineConfig } from 'vitest/config';
 import laravel from 'laravel-vite-plugin';
 import vue from '@vitejs/plugin-vue';
 
@@ -17,4 +17,7 @@ export default defineConfig({
             refresh: true,
         }),
     ],
+    test: {
+        environment: 'jsdom',
+    },
 });
