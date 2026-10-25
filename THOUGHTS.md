@@ -103,3 +103,40 @@ something I'll silently decide. It's on the README roadmap either way.
    would you add to CI before trusting it with a real schema?
 3. Why is separating `vitest.config.js` from `vite.config.js` a better fix than
    `LARAVEL_BYPASS_ENV_CHECK=1`? What does each actually change?
+
+---
+
+## M0 follow-up — upgrading the scaffold from Laravel 11 to Laravel 12
+
+### Why do this now, and why it was my question to ask rather than my call to make
+`composer audit` on the fresh scaffold reported 5 advisories against `laravel/framework` 11 —
+including a *critical* TokenGuard authentication-bypass — all fixed only in 12.x/13.x, because
+Laravel 11's security support ended March 2026. Two competing facts: (a) the project is specced
+as "Laravel 11" to mirror the target job description, and (b) staying on an EOL framework with a
+known critical advisory is a bad look for a *security-adjacent* portfolio piece.
+
+The reason I surfaced it instead of silently upgrading: changing the headline framework version
+is a spec decision, not a mechanical fix. The owner might have a reason to match "11" exactly.
+When a change contradicts the written spec, the right move is to present the tradeoff and let the
+owner decide — not to quietly override. The call was to move to 12.
+
+### Why a scaffold is the cheapest possible moment to do a major upgrade
+A framework major upgrade's cost scales with how much of *your* code touches the parts that
+changed. On a scaffold there's almost no app code — no models, no controllers, no middleware of
+ours — so the surface area for breakage is near zero. The same upgrade after M3 (ingestion jobs,
+migrations, API) would mean auditing every one of those against the upgrade guide. Doing it now
+converts a potentially painful future migration into a near-free version bump. "Upgrade early
+when the blast radius is smallest" is the general principle.
+
+### What actually changed, and what pleasantly didn't
+Laravel 12 is deliberately a low-breaking-change release. In practice: `composer.json` moved to
+`^12.0`, `composer update` resolved `laravel/framework` to 12.70.1 and pulled one new polyfill
+(`symfony/polyfill-php84`), and **no app-code changes were required** — the scaffold doesn't call
+any of the APIs the upgrade guide flags. All gates stayed green (Pint, PHPStan level 5 with no
+baseline, Pest, Vitest, Vite build) with no new fixes. The payoff is concrete: `composer audit`
+went from 5 advisories (1 critical) to **zero**.
+
+The lesson worth internalising: a clean upgrade is *evidence the scaffold was healthy*, not luck.
+Because there was no app code reaching into framework internals, there was nothing to break. The
+more your code couples to a framework's internals, the more a major bump hurts — which is an
+argument for leaning on documented, stable APIs over clever internals.
