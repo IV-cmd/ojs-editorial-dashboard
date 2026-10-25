@@ -11,6 +11,8 @@ on:
 jobs:
   php:
     runs-on: ubuntu-latest
+    env:
+      APP_ENV: testing
     steps:
       - uses: actions/checkout@v4
       - uses: shivammathur/setup-php@v2
