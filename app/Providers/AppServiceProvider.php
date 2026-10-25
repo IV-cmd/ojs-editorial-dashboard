@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Services\Ojs\HttpOjsClient;
 use App\Services\Ojs\MockOjsClient;
 use App\Services\Ojs\OjsClientInterface;
+use App\Services\Ojs\OjsDriverGuard;
 use Illuminate\Support\ServiceProvider;
 use InvalidArgumentException;
 
@@ -35,6 +36,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        OjsDriverGuard::assertNotMockInProduction(
+            $this->app->environment(),
+            (string) config('ojs.driver'),
+        );
     }
 }
