@@ -10,7 +10,7 @@ A personal learning project to build a dashboard over OJS 3.6 REST API data for 
 
 | Target stack | Status in repo |
 | --- | --- |
-| Laravel 11 / PHP 8.3 | Scaffolded |
+| Laravel 12 / PHP 8.3 | Scaffolded |
 | Vue 3 + Vite | Placeholder component |
 | MySQL 8 | Configured as the default connection; no application tables yet |
 | Pest / Pint / Larastan / Vitest | Configured; CI is on GitHub Actions |
@@ -63,4 +63,3 @@ npm run build
 - Helm chart for Kubernetes / OpenShift (M7)
 - GitLab CI
 - Large synthetic dataset, load tests, and N+1 / index tuning (TODO)
-- Upgrade to Laravel 12: Laravel 11 security support ended in March 2026
