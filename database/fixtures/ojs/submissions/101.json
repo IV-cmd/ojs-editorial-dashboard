@@ -1,0 +1,16 @@
+{
+    "id": 101,
+    "contextId": 1,
+    "status": 1,
+    "stageId": 1,
+    "dateSubmitted": "2022-01-03 09:00:00",
+    "dateLastActivity": "2022-02-01 09:00:00",
+    "lastModified": "2022-02-01 09:00:00",
+    "submissionProgress": "",
+    "currentPublicationId": null,
+    "publications": [],
+    "urlWorkflow": "https://ojs.example.invalid/index.php/journal/workflow/index/101",
+    "title": "Synthetic submission: stalled at intake",
+    "reviewRounds": [],
+    "reviewAssignments": []
+}

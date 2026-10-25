@@ -1,0 +1,78 @@
+[
+    {
+        "id": 101,
+        "contextId": 1,
+        "status": 1,
+        "stageId": 1,
+        "dateSubmitted": "2022-01-03 09:00:00",
+        "dateLastActivity": "2022-02-01 09:00:00",
+        "lastModified": "2022-02-01 09:00:00",
+        "submissionProgress": "",
+        "currentPublicationId": null,
+        "publications": [],
+        "urlWorkflow": "https://ojs.example.invalid/index.php/journal/workflow/index/101",
+        "title": "Synthetic submission: stalled at intake"
+    },
+    {
+        "id": 102,
+        "contextId": 1,
+        "status": 1,
+        "stageId": 1,
+        "dateSubmitted": "2026-10-20 09:00:00",
+        "dateLastActivity": "2026-10-24 09:00:00",
+        "lastModified": "2026-10-24 09:00:00",
+        "submissionProgress": "",
+        "currentPublicationId": null,
+        "publications": [],
+        "urlWorkflow": "https://ojs.example.invalid/index.php/journal/workflow/index/102",
+        "title": "Synthetic submission: recent intake"
+    },
+    {
+        "id": 103,
+        "contextId": 1,
+        "status": 3,
+        "stageId": 5,
+        "dateSubmitted": "2021-03-05 09:00:00",
+        "dateLastActivity": "2021-08-14 09:00:00",
+        "lastModified": "2021-08-14 09:00:00",
+        "submissionProgress": "",
+        "currentPublicationId": 1303,
+        "publications": [
+            {
+                "id": 1303,
+                "datePublished": "2021-08-14 09:00:00",
+                "title": "Synthetic publication: published example"
+            }
+        ],
+        "urlWorkflow": "https://ojs.example.invalid/index.php/journal/workflow/index/103",
+        "title": "Synthetic submission: published example"
+    },
+    {
+        "id": 104,
+        "contextId": 1,
+        "status": 4,
+        "stageId": 1,
+        "dateSubmitted": "2020-05-10 09:00:00",
+        "dateLastActivity": "2020-06-02 09:00:00",
+        "lastModified": "2020-06-02 09:00:00",
+        "submissionProgress": "",
+        "currentPublicationId": null,
+        "publications": [],
+        "urlWorkflow": "https://ojs.example.invalid/index.php/journal/workflow/index/104",
+        "title": "Synthetic submission: declined example"
+    },
+    {
+        "id": 105,
+        "contextId": 1,
+        "status": 1,
+        "stageId": 3,
+        "dateSubmitted": "2026-08-03 09:00:00",
+        "dateLastActivity": "2026-10-20 09:00:00",
+        "lastModified": "2026-10-20 09:00:00",
+        "submissionProgress": "",
+        "currentPublicationId": null,
+        "publications": [],
+        "urlWorkflow": "https://ojs.example.invalid/index.php/journal/workflow/index/105",
+        "title": "Synthetic submission: external review"
+    }
+]

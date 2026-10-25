@@ -1,0 +1,16 @@
+{
+    "id": 102,
+    "contextId": 1,
+    "status": 1,
+    "stageId": 1,
+    "dateSubmitted": "2026-10-20 09:00:00",
+    "dateLastActivity": "2026-10-24 09:00:00",
+    "lastModified": "2026-10-24 09:00:00",
+    "submissionProgress": "",
+    "currentPublicationId": null,
+    "publications": [],
+    "urlWorkflow": "https://ojs.example.invalid/index.php/journal/workflow/index/102",
+    "title": "Synthetic submission: recent intake",
+    "reviewRounds": [],
+    "reviewAssignments": []
+}

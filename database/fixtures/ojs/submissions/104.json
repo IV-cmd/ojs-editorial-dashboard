@@ -1,0 +1,16 @@
+{
+    "id": 104,
+    "contextId": 1,
+    "status": 4,
+    "stageId": 1,
+    "dateSubmitted": "2020-05-10 09:00:00",
+    "dateLastActivity": "2020-06-02 09:00:00",
+    "lastModified": "2020-06-02 09:00:00",
+    "submissionProgress": "",
+    "currentPublicationId": null,
+    "publications": [],
+    "urlWorkflow": "https://ojs.example.invalid/index.php/journal/workflow/index/104",
+    "title": "Synthetic submission: declined example",
+    "reviewRounds": [],
+    "reviewAssignments": []
+}

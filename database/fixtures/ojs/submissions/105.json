@@ -1,0 +1,54 @@
+{
+    "id": 105,
+    "contextId": 1,
+    "status": 1,
+    "stageId": 3,
+    "dateSubmitted": "2026-08-03 09:00:00",
+    "dateLastActivity": "2026-10-20 09:00:00",
+    "lastModified": "2026-10-20 09:00:00",
+    "submissionProgress": "",
+    "currentPublicationId": null,
+    "publications": [],
+    "urlWorkflow": "https://ojs.example.invalid/index.php/journal/workflow/index/105",
+    "title": "Synthetic submission: external review",
+    "reviewRounds": [
+        {
+            "id": 1,
+            "submissionId": 105,
+            "round": 1,
+            "stageId": 3
+        }
+    ],
+    "reviewAssignments": [
+        {
+            "id": 501,
+            "round": 1,
+            "reviewRoundId": 1,
+            "status": 6,
+            "dateAssigned": "2001-01-01 09:00:00",
+            "dateDue": "2001-01-15 09:00:00",
+            "dateResponseDue": "2001-01-10 09:00:00",
+            "reviewMethod": "anonymous"
+        },
+        {
+            "id": 502,
+            "round": 1,
+            "reviewRoundId": 1,
+            "status": 4,
+            "dateAssigned": "2001-02-01 09:00:00",
+            "dateDue": "2001-02-15 09:00:00",
+            "dateResponseDue": "2001-02-10 09:00:00",
+            "reviewMethod": "anonymous"
+        },
+        {
+            "id": 503,
+            "round": 1,
+            "reviewRoundId": 1,
+            "status": 5,
+            "dateAssigned": "2099-01-01 09:00:00",
+            "dateDue": "2099-02-01 09:00:00",
+            "dateResponseDue": "2099-01-15 09:00:00",
+            "reviewMethod": "anonymous"
+        }
+    ]
+}

@@ -1,0 +1,22 @@
+{
+    "id": 103,
+    "contextId": 1,
+    "status": 3,
+    "stageId": 5,
+    "dateSubmitted": "2021-03-05 09:00:00",
+    "dateLastActivity": "2021-08-14 09:00:00",
+    "lastModified": "2021-08-14 09:00:00",
+    "submissionProgress": "",
+    "currentPublicationId": 1303,
+    "publications": [
+        {
+            "id": 1303,
+            "datePublished": "2021-08-14 09:00:00",
+            "title": "Synthetic publication: published example"
+        }
+    ],
+    "urlWorkflow": "https://ojs.example.invalid/index.php/journal/workflow/index/103",
+    "title": "Synthetic submission: published example",
+    "reviewRounds": [],
+    "reviewAssignments": []
+}
