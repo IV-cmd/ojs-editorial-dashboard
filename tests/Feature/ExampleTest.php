@@ -1,19 +1,10 @@
 <?php
 
-namespace Tests\Feature;
+it('renders the scaffold shell', function () {
+    $this->withoutVite();
 
-// use Illuminate\Foundation\Testing\RefreshDatabase;
-use Tests\TestCase;
-
-class ExampleTest extends TestCase
-{
-    /**
-     * A basic test example.
-     */
-    public function test_the_application_returns_a_successful_response(): void
-    {
-        $response = $this->get('/');
-
-        $response->assertStatus(200);
-    }
-}
+    $this->get('/')
+        ->assertOk()
+        ->assertSee(config('app.name'))
+        ->assertSee('id="app"', false);
+});
