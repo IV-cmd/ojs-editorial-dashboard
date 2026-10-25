@@ -209,3 +209,26 @@ arrays. DTOs are tempting but premature — their right shape is driven by what 
 and persistence is M2. Building them now would be guessing. The client is pure fetch-and-decode;
 every decision about *what to do* with the data is deferred to the milestone that has the context
 to make it.
+
+### The guard caught CI before it caught production (a good surprise)
+Right after adding the "refuse to boot on mock-in-production" guard, the PHP CI job went red —
+during `composer install`, of all steps:
+
+```
+> @php artisan package:discover --ansi
+OJS driver is set to "mock" in production; refusing to boot and serve fabricated data.
+```
+
+This is the guard working *too well*, and it taught a real Laravel fact. Composer's
+post-autoload-dump hook runs `artisan package:discover`, which **boots the framework**. CI runs
+that before any `.env` is copied, so `APP_ENV` is unset — and Laravel defaults an unconfigured
+environment to **`production`**. Meanwhile the OJS driver defaults to `mock`. Production + mock is
+exactly the combination the guard exists to reject, so it fired on a build machine instead of a
+real deploy.
+
+The fix is to tell CI the truth about what it is: `env: { APP_ENV: testing }` on the PHP job only.
+The mock default and the guard are both left untouched — the guard's logic was never wrong, the
+environment label was. The lesson worth keeping: **"no config" does not mean "safe/dev" to Laravel
+— it means `production`.** Any guard keyed on the production environment will also judge every
+unconfigured context (CI, a bare `artisan` call, a container with no env) as production, so those
+contexts must declare their environment explicitly rather than relying on a benign-looking default.
