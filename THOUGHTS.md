@@ -140,3 +140,72 @@ The lesson worth internalising: a clean upgrade is *evidence the scaffold was he
 Because there was no app code reaching into framework internals, there was nothing to break. The
 more your code couples to a framework's internals, the more a major bump hurts — which is an
 argument for leaning on documented, stable APIs over clever internals.
+
+---
+
+## M1 — the OJS client + mock/fixture mode
+
+### The problem this milestone actually solves
+The whole dashboard reads from a live OJS 3.6 server. If every layer above it assumed a real
+server, nobody could run or test the app without one — and OJS is a heavy thing to stand up. So
+M1's real job isn't "write an HTTP client," it's "make the server a *swappable edge* so the other
+95% of the app never knows or cares whether the data came over the wire or from a JSON file on
+disk." That's why the interface comes first and the two drivers sit behind it.
+
+### Why the interface is two methods, not the spec's `getReviewAssignments()`
+The spec asked for `getSubmissions()` + `getReviewAssignments()`. Reading pkp-lib/ojs source
+(version.xml 3.6.0.0 — *not* live-tested, and the code says so) showed the list endpoint returns
+**summaries only**; review assignments exist solely on the `GET /submissions/{id}` detail object.
+There is no "list all assignments across the journal" endpoint in 3.6. So a clean
+`getReviewAssignments()` would have to secretly do list → N× detail → flatten. That's a *policy*
+(an N+1 trade-off, rate-limit strategy, caching) and the client's job is transport, not policy.
+The interface therefore mirrors the API exactly — `getSubmissions()` (summaries) +
+`getSubmission(int $id)` (detail, which *contains* the assignments) — and leaves the flatten
+decision to M3 ingestion where it belongs. The general rule: **the transport layer should express
+what the API actually offers, not the convenience shape a caller wishes it had.**
+
+### Why the fixtures are two genuinely different shapes
+The easy, wrong move is to author one rich submission object and return it from both the list and
+the detail. That makes the mock *lie*: tests would pass with `reviewAssignments` present in the
+list, then M3 would break on a real server where the list never carries them. So the summary
+fixture (`submissions.json`) deliberately omits `reviewAssignments`, and only the per-id detail
+files (`submissions/{id}.json`) carry the nested `reviewRounds[]`/`reviewAssignments[]`. A test
+asserts the summary has *no* `reviewAssignments` key. A mock is only useful if it lies in exactly
+zero ways that matter — otherwise it's a trap that passes CI and fails production.
+
+### Where pagination lives, and why the mock doesn't fake it
+OJS caps `count` at 100 and returns `{itemsMax, items}`. Pagination is an HTTP-transport detail,
+so it lives *inside* `HttpOjsClient` — not in the interface (callers say "give me all
+submissions," not "give me page 3") and not in a shared base class (there's one real paginator;
+a base class would be inheritance for its own sake). The loop advances the offset by the number
+of items actually returned and stops when the accumulated count reaches `itemsMax` or a page comes
+back empty — advancing by *items returned* rather than a blind `+100` is self-correcting if a page
+is short. `MockOjsClient` returns the whole fixture in one shot and does **not** pretend to
+paginate: faking pagination over static files would be theatre that tests nothing real. Pagination
+is proven instead with `Http::fake()` returning two pages.
+
+### Why one typed exception, and the token-redaction trap
+Callers should never see Guzzle/Laravel HTTP types leak out of the client, so every transport or
+non-2xx failure is wrapped in a single `OjsApiException` carrying the HTTP status and a truncated
+(500-char) body snippet. The subtle hazard: the thing that authenticates us — the bearer token —
+must never end up in an exception message or a log. Two defences: we never put request *headers*
+into the exception (only the response body), and as a belt-and-braces measure the client
+string-replaces the token with `[redacted]` in any body before constructing the exception. A test
+feeds a response body containing the token and asserts the message does **not** contain it. The
+principle: **the error path is still a code path — secrets can leak through a stack trace as
+easily as through a log line.**
+
+### Why the driver defaults to `mock`
+`config('ojs.driver')` defaults to `mock` and `phpunit.xml` pins `OJS_DRIVER=mock`. A fresh clone
+with no `.env` edits therefore boots, serves, and runs the full test suite with **zero external
+dependencies** — no OJS, no token, no network. That's the entire point of M1: a contributor (or
+CI) proves the app works before anyone hands them a real OJS instance. Defaulting to `http` would
+make a blank checkout fail on first run, which is exactly the "works on my machine" failure M0's
+reproducibility work was fighting. The safe default is the one that needs the least to be true.
+
+### What stayed out (scope discipline)
+No migrations, no persistence, no queue jobs, no DTOs, no UI. Return shapes are plain decoded
+arrays. DTOs are tempting but premature — their right shape is driven by what *persistence* needs,
+and persistence is M2. Building them now would be guessing. The client is pure fetch-and-decode;
+every decision about *what to do* with the data is deferred to the milestone that has the context
+to make it.
