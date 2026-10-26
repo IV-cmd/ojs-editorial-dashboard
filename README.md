@@ -45,17 +45,27 @@ npm test
 npm run build
 ```
 
+## Ingestion
+
+`php artisan ojs:sync` dispatches `SyncSubmissions`, which lists submissions from the configured OJS client and dispatches one `IngestSubmission` job per submission. Each of those fetches the submission detail and passes it to `OjsUpserter`, which writes the submission and its nested review assignments in one database transaction. The scheduler in `routes/console.php` runs the sync hourly; in production a scheduler and a queue worker (`php artisan queue:work`) must both be running.
+
+Writes are upserts keyed on OJS identifiers: `(context_id, ojs_id)` for submissions and `ojs_id` for review assignments. Running the sync again updates existing rows rather than adding new ones, and the unique keys in the schema reject duplicates if two runs overlap.
+
+Upsert-only: a review assignment that disappears from OJS is not deleted locally. Deleting every assignment and reinserting it on each run would change local row IDs and lose the last known state, so pruning is left as a separate, explicit decision.
+
 ## Repository layout
 
 - `app/Services/Ojs/` — planned OJS client (M1)
-- `app/Jobs/` — planned ingestion jobs (M3)
+- `app/Jobs/` — queued OJS ingestion jobs
+- `app/Services/Ingestion/` — upsert logic used by the ingestion jobs
 - `deploy/helm/` — planned Helm chart (M7)
 - `resources/js/` — Vue scaffold and placeholder component
 
 ## Roadmap / not yet done
 
 - OJS 3.6 REST client and fixture mock mode (M1)
-- MySQL schema for submissions, reviews, review assignments, and publications; scheduled queue ingestion (M3)
+- Pruning review assignments that were removed upstream (see Ingestion)
+- Batched ingestion jobs instead of one job per submission
 - Internal JSON API and role-based access
 - Vue dashboard views for stuck submissions, overdue reviews, and publication throughput
 - Prometheus metrics and Grafana

@@ -301,3 +301,47 @@ No `publications` table. The only thing the dashboard needs from publications is
 queries (stuck, overdue, throughput) need publication *rows*. Building a speculative table "because
 OJS has one" would be code with no caller — deferred to a roadmap line instead. Also no ingestion,
 no API, no UI — those are M3/M4/M5.
+
+## Ingestion — a queued sync that is safe to re-run
+
+### The problem
+The dashboard should read local MySQL, not OJS, so something has to copy OJS data in on a
+timetable. That copy runs again and again over the same records, and the queue can deliver the
+same job twice (timeouts, worker crashes, retries). So "it ran twice" is normal, not an edge case.
+The real requirement is that a second run changes nothing it shouldn't.
+
+### Upsert logic kept apart from job plumbing
+`OjsUpserter` takes a decoded detail array and writes rows. It makes no HTTP calls and knows
+nothing about queues, so the tests call it directly with plain arrays. The jobs only move data
+around: `SyncSubmissions` lists summaries and dispatches work, and `IngestSubmission` fetches one
+detail and passes it to the upserter.
+
+### Why the natural keys, and why the schema still matters
+Every write is `updateOrCreate` matched on `(context_id, ojs_id)` or the assignment `ojs_id`,
+never a plain `create()`. The application-level "find then write" isn't atomic by itself: two
+overlapping runs could both miss the row and both insert it. The unique keys in the schema are
+what reject the second insert, so the upsert relies on them.
+
+### One job per submission, carrying only the ID
+Fanning out one job per submission means one bad or slow submission retries alone instead of
+re-running the whole sync. The job carries the OJS ID, not the payload, so a retry re-fetches
+current data instead of replaying a stale snapshot. `$tries = 3` with backoff 10/30/60s gives
+OJS time to recover. Batching would cut job overhead at scale and stays on the roadmap until
+there's a measured reason to add it.
+
+### One transaction per submission
+The submission and its review assignments are written in one `DB::transaction`. If any
+assignment fails, the whole submission rolls back, so there's never a submission with half its
+assignments. The rollback test passes an assignment with no ID (which violates NOT NULL) and
+asserts that neither the submission nor its valid sibling assignment was kept.
+
+### Upsert-only, on purpose
+Assignments removed upstream are not pruned. Deleting everything and reinserting on each run
+would look tidy, but it changes local row IDs every run and throws away the last known state.
+A pruning step can be added later as an explicit decision.
+
+### What I verified, and how
+The full sync runs twice in Pest on MySQL 8 (sync queue, mock driver), and the test checks that
+row counts and local IDs are identical. Outside the tests I ran `ojs:sync` against MySQL with the
+database queue and `queue:work --stop-when-empty`, twice: 5 submissions and 3 assignments, the
+same IDs both times, 0 failed jobs. Not verified: anything against a live OJS server.
