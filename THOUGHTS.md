@@ -232,3 +232,72 @@ environment label was. The lesson worth keeping: **"no config" does not mean "sa
 — it means `production`.** Any guard keyed on the production environment will also judge every
 unconfigured context (CI, a bare `artisan` call, a container with no env) as production, so those
 contexts must declare their environment explicitly rather than relying on a benign-looking default.
+
+---
+
+## M2 — the MySQL persistence layer
+
+### The problem this milestone solves (and what it deliberately doesn't)
+M1 gave us a client that returns OJS data as plain arrays. But an array vanishes the moment the
+request ends — there's nowhere for ingested data to *live*, nothing to query for "stuck
+submissions," no way for M3 to run twice without duplicating everything. M2 is purely about
+*shape and place*: where ingested rows land, how they're typed, and — the load-bearing part — what
+makes a row's identity unique so M3 can re-run safely. M2 intentionally does **not** fetch or
+populate anything from the client; wiring the client to the tables is M3. Keeping "define the
+schema" and "fill the schema" in separate milestones means each is reviewable on its own.
+
+### Why `ojs_id` is a column, not the primary key
+The tempting shortcut is to use OJS's submission id as our primary key. It's wrong for two reasons.
+First, it couples our local identity to a foreign system — if we ever ingest from a second OJS
+context, or OJS reissues ids, our PK space collides. Second, foreign keys and relationships should
+point at *our* stable local id, not a number we don't control. So every table keeps a local
+auto-increment `id` as PK, and the OJS id lives in a separate `ojs_id` column. The relationship
+(`review_assignments.submission_id`) references the local `submissions.id`, never the OJS id.
+
+### The one decision the whole milestone rests on: the UNIQUE key
+M3 will ingest on a schedule and must be *idempotent* — running it twice must not create two copies
+of the same submission. The clean way to guarantee that is `updateOrCreate`/`upsert` keyed on a
+natural key, which only works if the database *enforces* that the key is unique. So M2 adds
+`UNIQUE(context_id, ojs_id)` on submissions and `UNIQUE(ojs_id)` on review assignments now, before
+any ingestion exists. The composite on submissions is because an OJS submission id is only unique
+*within a journal/context*; a review-assignment id is globally unique in OJS 3.6, so a single-column
+unique is enough and a composite would be redundant. Enforcing uniqueness at the schema level, not
+in application code, is what makes the idempotency guarantee real rather than hopeful — the database
+rejects the duplicate even if a bug in the ingestion logic tries to write it.
+
+### Why the tests had to move off SQLite onto MySQL 8 (the biggest change here)
+M0/M1 tested on SQLite in-memory because it's instant and needs no server. That was fine while the
+tests exercised no real constraints. M2 breaks that: the entire point is a UNIQUE constraint, and
+**SQLite and MySQL do not enforce constraints identically** (type affinity, how violations surface,
+index semantics all differ). A duplicate-insert test that passes on SQLite would be testing a
+different engine than the one production and M3 rely on — a green test that proves nothing. So the
+suite now runs on MySQL 8: `phpunit.xml` switches to the `mysql` connection, and the CI PHP job
+gains a `mysql:8` service container (with a health-check so tests wait until it's ready) and swaps
+the `pdo_sqlite` extension for `pdo_mysql`. The duplicate-key tests even assert
+`DB::connection()->getDriverName() === 'mysql'` first, so they can't silently pass on the wrong
+engine. The cost is that running the suite now requires a MySQL instance (locally: a docker
+container); that's the right trade — a test is only worth running if it tests the real thing.
+
+### Casts, immutability, and the UTC assumption
+Dates cast to `immutable_datetime` (CarbonImmutable) rather than mutable Carbon, so a date read
+from a model can't be accidentally mutated in place by a caller — a small correctness guard that
+costs nothing. Booleans (`declined`, `cancelled`) cast to real `bool` so query code never has to
+remember they're `1`/`0` in the column. OJS stores timestamps in UTC (read from 3.6 source, stated
+in the migration comment as *not* verified against a live server), and the app runs UTC, so values
+are stored as-is with no conversion — a conversion we don't need is a bug we can't introduce.
+
+### Indexes: justified, not speculative
+Indexes on `status`, `stage_id`, `date_last_activity` (submissions) and `date_due`,
+`date_completed` (review assignments) each map to a concrete M4 query path (stuck submissions,
+overdue reviews). I deliberately did **not** index the `declined`/`cancelled` booleans: a
+two-value column has terrible selectivity, so a standalone index on it rarely helps and still costs
+on every write. If M4's measured query plans want it, a *composite* index combining a boolean with
+`date_due` is the better tool — that's a roadmap item, not a guess made now. The general rule: an
+index is a bet that a specific query will run often; add it when you know the query, not before.
+
+### What M2 left out on purpose
+No `publications` table. The only thing the dashboard needs from publications is
+`current_publication_id`, which is a plain nullable column on `submissions`; none of M4's three
+queries (stuck, overdue, throughput) need publication *rows*. Building a speculative table "because
+OJS has one" would be code with no caller — deferred to a roadmap line instead. Also no ingestion,
+no API, no UI — those are M3/M4/M5.
