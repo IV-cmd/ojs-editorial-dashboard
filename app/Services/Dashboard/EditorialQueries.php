@@ -81,6 +81,20 @@ final class EditorialQueries
     }
 
     /**
+     * The distinct filter values the data actually contains, so the UI can build its dropdowns
+     * from real options instead of a hardcoded list that could drift from the data.
+     *
+     * @return array{statuses: list<int>, context_ids: list<int>}
+     */
+    public function filterOptions(): array
+    {
+        return [
+            'statuses' => Submission::query()->distinct()->orderBy('status')->pluck('status')->map(fn ($v): int => (int) $v)->all(),
+            'context_ids' => Submission::query()->distinct()->orderBy('context_id')->pluck('context_id')->map(fn ($v): int => (int) $v)->all(),
+        ];
+    }
+
+    /**
      * @return array{submissions_total: int, submissions_by_status: list<array{status: int, count: int}>, stuck_count: int, overdue_reviews_count: int}
      */
     public function summary(CarbonImmutable $asOf): array

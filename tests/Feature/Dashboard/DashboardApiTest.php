@@ -140,3 +140,12 @@ it('returns summary counts backed by the ingested data', function () {
             'meta' => ['as_of' => '2026-10-27T12:00:00+00:00', 'stuck_threshold_days' => 14],
         ]);
 });
+
+it('exposes the distinct filter values present in the data', function () {
+    actingAsViewer();
+
+    $this->getJson('/api/meta/filters')
+        ->assertOk()
+        ->assertExactJson(['data' => ['statuses' => [1, 3, 4], 'context_ids' => [1]]]);
+});
+
