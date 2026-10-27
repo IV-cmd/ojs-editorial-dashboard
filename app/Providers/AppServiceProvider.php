@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Models\User;
+use App\Services\Dashboard\EditorialQueries;
 use App\Services\Ojs\HttpOjsClient;
 use App\Services\Ojs\MockOjsClient;
 use App\Services\Ojs\OjsClientInterface;
@@ -32,6 +33,9 @@ class AppServiceProvider extends ServiceProvider
             };
         });
 
+        $this->app->bind(EditorialQueries::class, fn (): EditorialQueries => new EditorialQueries(
+            (int) config('dashboard.stuck_days', 14),
+        ));
     }
 
     /**
