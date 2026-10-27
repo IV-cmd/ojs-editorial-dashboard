@@ -2,10 +2,12 @@
 
 namespace App\Providers;
 
+use App\Models\User;
 use App\Services\Ojs\HttpOjsClient;
 use App\Services\Ojs\MockOjsClient;
 use App\Services\Ojs\OjsClientInterface;
 use App\Services\Ojs\OjsDriverGuard;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use InvalidArgumentException;
 
@@ -29,6 +31,7 @@ class AppServiceProvider extends ServiceProvider
                 default => throw new InvalidArgumentException('Unsupported OJS client driver.'),
             };
         });
+
     }
 
     /**
@@ -40,5 +43,10 @@ class AppServiceProvider extends ServiceProvider
             $this->app->environment(),
             (string) config('ojs.driver'),
         );
+
+        // Reviewer identities are sensitive in peer review, so only editors may list raw
+        // submission records or see which reviewer holds an assignment.
+        Gate::define('view-submissions', fn (User $user): bool => $user->isEditor());
+        Gate::define('view-reviewer-identity', fn (User $user): bool => $user->isEditor());
     }
 }

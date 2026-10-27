@@ -15,9 +15,15 @@ class DatabaseSeeder extends Seeder
     {
         // User::factory(10)->create();
 
+        // Local demo accounts only (factory password: "password"). One per role.
+        User::factory()->editor()->create([
+            'name' => 'Demo Editor',
+            'email' => 'editor@example.com',
+        ]);
+
         User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
+            'name' => 'Demo Viewer',
+            'email' => 'viewer@example.com',
         ]);
 
         $this->call(OjsSampleSeeder::class);
