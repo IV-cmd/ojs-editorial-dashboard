@@ -53,11 +53,45 @@ Writes are upserts keyed on OJS identifiers: `(context_id, ojs_id)` for submissi
 
 Upsert-only: a review assignment that disappears from OJS is not deleted locally. Deleting every assignment and reinserting it on each run would change local row IDs and lose the last known state, so pruning is left as a separate, explicit decision.
 
+## API
+
+JSON endpoints under `/api`, for the dashboard frontend. Every endpoint requires a Laravel Sanctum token (`Authorization: Bearer <token>`). Without one the response is a JSON `401`.
+
+| Endpoint | Roles | Returns |
+| --- | --- | --- |
+| `GET /api/user` | any | The current user's id, name, email, and role |
+| `GET /api/submissions` | editor | Paginated submissions with review assignment counts. Query: `status`, `context_id`, `per_page` (max 100), `page` |
+| `GET /api/submissions/{id}` | editor | One submission (local `id`) with its review assignments |
+| `GET /api/dashboard/summary` | any | Submission counts by status, total, stuck count, and overdue review count |
+| `GET /api/dashboard/stuck` | any | Paginated stuck submissions, plus the threshold used |
+| `GET /api/dashboard/overdue-reviews` | any | Paginated overdue review assignments |
+
+Roles:
+
+- `editor` can see every endpoint, including `reviewer_id` on review assignments.
+- `viewer` is the default for new users. It can see the dashboard endpoints. `reviewer_id` is left out of its responses, and the raw submission endpoints return `403`.
+
+The schema stores only the numeric OJS reviewer ID, not reviewer names.
+
+Rules, implemented in `app/Services/Dashboard/EditorialQueries.php`:
+
+- **Stuck:** status `1` (queued, still in the workflow) with `date_last_activity` at least `DASHBOARD_STUCK_DAYS` days old (default 14).
+- **Overdue:** `date_due` before today, `date_completed` empty, and not declined or cancelled.
+- **Status codes:** read from OJS 3.6 source, not checked against a live server.
+
+`php artisan db:seed` creates the local demo users `editor@example.com` and `viewer@example.com` (password `password`). To issue a token:
+
+```sh
+php artisan tinker --execute='echo App\Models\User::where("email", "editor@example.com")->first()->createToken("local")->plainTextToken;'
+```
+
 ## Repository layout
 
 - `app/Services/Ojs/` — planned OJS client (M1)
 - `app/Jobs/` — queued OJS ingestion jobs
 - `app/Services/Ingestion/` — upsert logic used by the ingestion jobs
+- `app/Services/Dashboard/` — stuck and overdue rules used by the API
+- `app/Http/Controllers/Api/`, `app/Http/Resources/` — JSON API controllers and response shapes
 - `deploy/helm/` — planned Helm chart (M7)
 - `resources/js/` — Vue scaffold and placeholder component
 
@@ -66,7 +100,7 @@ Upsert-only: a review assignment that disappears from OJS is not deleted locally
 - OJS 3.6 REST client and fixture mock mode (M1)
 - Pruning review assignments that were removed upstream (see Ingestion)
 - Batched ingestion jobs instead of one job per submission
-- Internal JSON API and role-based access
+- Cookie-based Sanctum SPA authentication and a login flow for the Vue app (only tokens exist today)
 - Vue dashboard views for stuck submissions, overdue reviews, and publication throughput
 - Prometheus metrics and Grafana
 - Dockerfile and Compose setup
