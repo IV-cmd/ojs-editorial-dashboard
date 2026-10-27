@@ -56,11 +56,12 @@ Upsert-only: a review assignment that disappears from OJS is not deleted locally
 
 ## API
 
-JSON endpoints under `/api`, for the dashboard frontend. Every endpoint requires a Laravel Sanctum token (`Authorization: Bearer <token>`). Without one the response is a JSON `401`.
+JSON endpoints under `/api`, for the dashboard frontend. Full request/response contracts are in [`docs/api.md`](docs/api.md). Every endpoint requires a Laravel Sanctum token (`Authorization: Bearer <token>`). Without one the response is a JSON `401`. Authenticated requests are throttled to 60 per minute per user.
 
 | Endpoint | Roles | Returns |
 | --- | --- | --- |
 | `GET /api/user` | any | The current user's id, name, email, and role |
+| `GET /api/meta/filters` | any | Distinct `status` and `context_id` values present, for filter dropdowns |
 | `GET /api/submissions` | editor | Paginated submissions with review assignment counts. Query: `status`, `context_id`, `per_page` (max 100), `page` |
 | `GET /api/submissions/{id}` | editor | One submission (local `id`) with its review assignments |
 | `GET /api/dashboard/summary` | any | Submission counts by status, total, stuck count, and overdue review count |
