@@ -149,3 +149,10 @@ it('exposes the distinct filter values present in the data', function () {
         ->assertExactJson(['data' => ['statuses' => [1, 3, 4], 'context_ids' => [1]]]);
 });
 
+it('throttles authenticated requests and advertises the limit', function () {
+    actingAsViewer();
+
+    $this->getJson('/api/dashboard/summary')
+        ->assertOk()
+        ->assertHeader('X-RateLimit-Limit', 60);
+});

@@ -6,7 +6,8 @@ use App\Http\Controllers\Api\SubmissionController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware('auth:sanctum')->group(function () {
+// 60 requests/minute per user caps the blast radius of a runaway client or a leaked token.
+Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
     Route::get('/user', fn (Request $request) => $request->user()?->only(['id', 'name', 'email', 'role']));
 
     // Distinct status/context values present in the data, for the UI's filter dropdowns.
