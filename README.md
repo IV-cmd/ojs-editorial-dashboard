@@ -2,27 +2,28 @@
 
 [![CI](https://github.com/IV-cmd/ojs-editorial-dashboard/actions/workflows/ci.yml/badge.svg)](https://github.com/IV-cmd/ojs-editorial-dashboard/actions/workflows/ci.yml)
 
-A personal learning project to build a dashboard over OJS 3.6 REST API data for editorial teams. The dashboard and OJS integration are planned; this repository currently contains only the initial application scaffold.
+A personal learning project: an operational dashboard over OJS 3.6 REST API data for editorial teams. OJS ingestion, persistence, and an authenticated JSON API are in place; the Vue dashboard and deployment tooling are still to come.
 
 ## Status
 
-**M0 — scaffold only. No OJS integration, data, or dashboard features exist yet.**
-
-| Target stack | Status in repo |
+| Area | Status in repo |
 | --- | --- |
-| Laravel 12 / PHP 8.3 | Scaffolded |
-| Vue 3 + Vite | Placeholder component |
-| MySQL 8 | Configured as the default connection; no application tables yet |
+| Laravel 12 / PHP 8.3 | Working application |
+| MySQL 8 schema, models, factories, seeders | Done |
+| OJS 3.6 client with fixture-backed mock mode | Done (mock is the default; no live OJS is called) |
+| Idempotent ingestion queue jobs (`ojs:sync`) | Done |
+| Authenticated JSON API with editor/viewer roles | Done |
+| Vue 3 + Vite | Placeholder component only |
+| Docker, Helm, OpenShift, GitLab CI, Prometheus / Grafana | Not started |
 | Pest / Pint / Larastan / Vitest | Configured; CI is on GitHub Actions |
-| Docker, Helm, OpenShift, GitLab CI, Prometheus / Grafana | Planned, not started |
 
-### Mock mode (planned)
+### Mock mode
 
-Later milestones will add a fixture-backed mode so the app can run without an OJS instance. This is not implemented yet.
+The OJS client defaults to a fixture-backed mock driver, so the app runs with no OJS instance and no token. Set `OJS_DRIVER=http` with real credentials to talk to a live server. The production environment refuses to boot with the mock driver.
 
 ## Setup
 
-Requirements: PHP 8.3, Composer 2, Node.js 22, and optionally MySQL 8. MySQL is not needed for this scaffold: file-based sessions and cache plus the synchronous queue let the app boot without a database connection.
+Requirements: PHP 8.3, Composer 2, Node.js 22, and MySQL 8. After `php artisan migrate --seed` the app ingests the bundled fixtures with `php artisan ojs:sync`.
 
 ```sh
 composer install
@@ -71,12 +72,12 @@ Roles:
 - `editor` can see every endpoint, including `reviewer_id` on review assignments.
 - `viewer` is the default for new users. It can see the dashboard endpoints. `reviewer_id` is left out of its responses, and the raw submission endpoints return `403`.
 
-The schema stores only the numeric OJS reviewer ID, not reviewer names.
+The schema deliberately stores only the numeric OJS reviewer ID, never reviewer names. Reviewer anonymity matters in peer review, so a viewer being unable to identify reviewers is enforced by the data model, not just by policy. Adding real names would be a deliberate schema change, not a missing feature.
 
 Rules, implemented in `app/Services/Dashboard/EditorialQueries.php`:
 
 - **Stuck:** status `1` (queued, still in the workflow) with `date_last_activity` at least `DASHBOARD_STUCK_DAYS` days old (default 14).
-- **Overdue:** `date_due` before today, `date_completed` empty, and not declined or cancelled.
+- **Overdue:** `date_due` before today, `date_completed` empty, and not declined or cancelled. A review due today is deliberately not overdue until the day is past: a due date is a deadline, not a violation until it is missed.
 - **Status codes:** read from OJS 3.6 source, not checked against a live server.
 
 `php artisan db:seed` creates the local demo users `editor@example.com` and `viewer@example.com` (password `password`). To issue a token:
@@ -87,23 +88,21 @@ php artisan tinker --execute='echo App\Models\User::where("email", "editor@examp
 
 ## Repository layout
 
-- `app/Services/Ojs/` — planned OJS client (M1)
+- `app/Services/Ojs/` — OJS client (HTTP driver and fixture-backed mock driver)
 - `app/Jobs/` — queued OJS ingestion jobs
 - `app/Services/Ingestion/` — upsert logic used by the ingestion jobs
 - `app/Services/Dashboard/` — stuck and overdue rules used by the API
 - `app/Http/Controllers/Api/`, `app/Http/Resources/` — JSON API controllers and response shapes
-- `deploy/helm/` — planned Helm chart (M7)
 - `resources/js/` — Vue scaffold and placeholder component
 
 ## Roadmap / not yet done
 
-- OJS 3.6 REST client and fixture mock mode (M1)
 - Pruning review assignments that were removed upstream (see Ingestion)
 - Batched ingestion jobs instead of one job per submission
 - Cookie-based Sanctum SPA authentication and a login flow for the Vue app (only tokens exist today)
 - Vue dashboard views for stuck submissions, overdue reviews, and publication throughput
 - Prometheus metrics and Grafana
 - Dockerfile and Compose setup
-- Helm chart for Kubernetes / OpenShift (M7)
+- Helm chart for Kubernetes / OpenShift
 - GitLab CI
 - Large synthetic dataset, load tests, and N+1 / index tuning (TODO)
