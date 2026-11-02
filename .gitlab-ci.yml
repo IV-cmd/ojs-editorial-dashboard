@@ -1,0 +1,65 @@
+# GitLab equivalent of .github/workflows/ci.yml — keep the two semantically in sync.
+stages:
+  - test
+  - build
+
+variables:
+  APP_ENV: testing
+  DB_CONNECTION: mysql
+  DB_HOST: mysql
+  DB_PORT: "3306"
+  DB_DATABASE: ojs_dashboard_test
+  DB_USERNAME: root
+  DB_PASSWORD: password
+  QUEUE_CONNECTION: sync
+  OJS_DRIVER: mock
+
+php-test:
+  stage: test
+  image: php:8.3
+  services:
+    - name: mysql:8
+      alias: mysql
+      variables:
+        MYSQL_DATABASE: ojs_dashboard_test
+        MYSQL_ROOT_PASSWORD: password
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq git unzip libzip-dev libonig-dev
+    - docker-php-ext-install pdo_mysql zip mbstring
+    - curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+    - composer install --no-interaction --prefer-dist --no-progress
+    - cp .env.example .env && php artisan key:generate
+  script:
+    - vendor/bin/pint --test
+    - vendor/bin/phpstan analyse --no-progress
+    - php artisan test
+  cache:
+    key: composer-$CI_COMMIT_REF_SLUG
+    paths:
+      - vendor
+
+node-test:
+  stage: test
+  image: node:22
+  script:
+    - npm ci
+    - npm test
+    - npm run build
+  cache:
+    key: npm-$CI_COMMIT_REF_SLUG
+    paths:
+      - node_modules
+
+docker-build:
+  stage: build
+  image: docker:latest
+  services:
+    - docker:dind
+  needs: ["php-test", "node-test"]
+  script:
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
+    - docker build -t "$CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA" -t "$CI_REGISTRY_IMAGE:latest" .
+    - docker push "$CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA"
+    - docker push "$CI_REGISTRY_IMAGE:latest"
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
