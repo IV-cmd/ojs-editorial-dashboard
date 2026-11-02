@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/IV-cmd/ojs-editorial-dashboard/actions/workflows/ci.yml/badge.svg)](https://github.com/IV-cmd/ojs-editorial-dashboard/actions/workflows/ci.yml)
 
-A personal learning project: an operational dashboard over OJS 3.6 REST API data for editorial teams. OJS ingestion, persistence, and an authenticated JSON API are in place; the Vue dashboard and deployment tooling are still to come.
+A personal learning project: an operational dashboard over OJS 3.6 REST API data for editorial teams. OJS ingestion, persistence, an authenticated JSON API, and a Vue dashboard over that API are in place; observability and deployment tooling are still to come.
 
 ## Status
 
@@ -13,7 +13,7 @@ A personal learning project: an operational dashboard over OJS 3.6 REST API data
 | OJS 3.6 client with fixture-backed mock mode | Done (mock is the default; no live OJS is called) |
 | Idempotent ingestion queue jobs (`ojs:sync`) | Done |
 | Authenticated JSON API with editor/viewer roles | Done |
-| Vue 3 + Vite | Placeholder component only |
+| Vue 3 dashboard (summary, stuck submissions, overdue reviews) | Done (token sign-in) |
 | Docker, Helm, OpenShift, GitLab CI, Prometheus / Grafana | Not started |
 | Pest / Pint / Larastan / Vitest | Configured; CI is on GitHub Actions |
 
@@ -87,6 +87,34 @@ Rules, implemented in `app/Services/Dashboard/EditorialQueries.php`:
 php artisan tinker --execute='echo App\Models\User::where("email", "editor@example.com")->first()->createToken("local")->plainTextToken;'
 ```
 
+## Dashboard
+
+A Vue 3 single-page app served by Laravel at `/`. It reads only from the JSON API above; every number and row on screen comes from an API response.
+
+- **Summary** (default): total submissions, stuck submissions, overdue reviews, and submissions per status, from `GET /api/dashboard/summary`.
+- **Stuck submissions**: table from `GET /api/dashboard/stuck` with OJS ID, context ID, status, days since last activity, and review count. Status and context filters are filled from `GET /api/meta/filters`, so they only offer values that exist in the data.
+- **Overdue reviews**: table from `GET /api/dashboard/overdue-reviews` with submission, review, round, due date, and days overdue. The reviewer ID column appears only when the response contains `reviewer_id`, so viewers never get one.
+
+The schema stores no submission title and no status-change date, so the tables show the OJS ID and the days since `date_last_activity` instead.
+
+Each view has loading, empty, and error states. A `401` clears the stored token and returns to the sign-in screen with a message.
+
+To run it locally against the mock data:
+
+```sh
+php artisan migrate --seed
+php artisan ojs:sync
+npm run build        # or `npm run dev` while editing the frontend
+php artisan serve
+```
+
+Create a token for each seeded role and paste one into the sign-in screen. The token is kept in the browser's `localStorage` and sent as `Authorization: Bearer <token>`.
+
+```sh
+php artisan tinker --execute='echo App\Models\User::where("email", "editor@example.com")->first()->createToken("dashboard")->plainTextToken;'
+php artisan tinker --execute='echo App\Models\User::where("email", "viewer@example.com")->first()->createToken("dashboard")->plainTextToken;'
+```
+
 ## Repository layout
 
 - `app/Services/Ojs/` — OJS client (HTTP driver and fixture-backed mock driver)
@@ -94,14 +122,14 @@ php artisan tinker --execute='echo App\Models\User::where("email", "editor@examp
 - `app/Services/Ingestion/` — upsert logic used by the ingestion jobs
 - `app/Services/Dashboard/` — stuck and overdue rules used by the API
 - `app/Http/Controllers/Api/`, `app/Http/Resources/` — JSON API controllers and response shapes
-- `resources/js/` — Vue scaffold and placeholder component
+- `resources/js/` — Vue dashboard: `api.js` (the only module that calls the API), `lib/` (pure date, filter, and sort helpers), `views/`, `components/`, and Vitest tests in `__tests__/`
 
 ## Roadmap / not yet done
 
 - Pruning review assignments that were removed upstream (see Ingestion)
 - Batched ingestion jobs instead of one job per submission
-- Cookie-based Sanctum SPA authentication and a login flow for the Vue app (only tokens exist today)
-- Vue dashboard views for stuck submissions, overdue reviews, and publication throughput
+- Cookie-based Sanctum SPA authentication instead of pasted tokens
+- Publication throughput view (needs publication dates, which are not stored yet)
 - Prometheus metrics and Grafana
 - Dockerfile and Compose setup
 - Helm chart for Kubernetes / OpenShift
