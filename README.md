@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/IV-cmd/ojs-editorial-dashboard/actions/workflows/ci.yml/badge.svg)](https://github.com/IV-cmd/ojs-editorial-dashboard/actions/workflows/ci.yml)
 
-A personal learning project: an operational dashboard over OJS 3.6 REST API data for editorial teams. OJS ingestion, persistence, an authenticated JSON API, and a Vue dashboard over that API are in place; observability and deployment tooling are still to come.
+A personal learning project: an operational dashboard over OJS 3.6 REST API data for editorial teams. OJS ingestion, persistence, an authenticated JSON API, a Vue dashboard over that API, and Prometheus/Grafana observability are in place; deployment tooling is still to come.
 
 ## Status
 
@@ -14,7 +14,8 @@ A personal learning project: an operational dashboard over OJS 3.6 REST API data
 | Idempotent ingestion queue jobs (`ojs:sync`) | Done |
 | Authenticated JSON API with editor/viewer roles | Done |
 | Vue 3 dashboard (summary, stuck submissions, overdue reviews) | Done (token sign-in) |
-| Docker, Helm, OpenShift, GitLab CI, Prometheus / Grafana | Not started |
+| Prometheus metrics, Grafana dashboard, sync run history | Done (local docker compose stack) |
+| Production image, Helm, OpenShift, GitLab CI | Not started |
 | Pest / Pint / Larastan / Vitest | Configured; CI is on GitHub Actions |
 
 ### Mock mode
@@ -115,6 +116,37 @@ php artisan tinker --execute='echo App\Models\User::where("email", "editor@examp
 php artisan tinker --execute='echo App\Models\User::where("email", "viewer@example.com")->first()->createToken("dashboard")->plainTextToken;'
 ```
 
+## Observability
+
+Every `ojs:sync` attempt writes a row to `sync_runs`: start and finish time, result, rows upserted, and failures by reason. `SyncRunStarted` and `SyncRunFinished` events fire around it. The dashboard shows the latest row as a status bar, from `GET /api/sync-runs/latest`. Editors also see the first error message; viewers see only the counts.
+
+`GET /metrics` serves Prometheus text format. It needs no token, so restrict it at the network level in any shared deployment.
+
+| Metric | Type | Source |
+| --- | --- | --- |
+| `ojs_sync_duration_seconds` | histogram | finished `sync_runs`, start to last detail job (includes queue wait and retries) |
+| `ojs_sync_total{result}` | counter | `sync_runs` by result (`success`, `failure`) |
+| `ojs_upserted_total{entity}` | counter | rows written (`submission`, `review_assignment`) |
+| `ojs_sync_failures_total{reason}` | counter | `api_error`, `validation`, `db`, `other`; a detail job counts once, after its retries |
+| `ojs_sync_last_success_timestamp` | gauge | Unix time of the last successful run (0 if none) |
+| `ojs_submissions_stuck`, `ojs_reviews_overdue` | gauge | the same `EditorialQueries` rules as the API, at scrape time |
+
+The metrics are rebuilt from the database on every scrape instead of being held in process memory. Queue workers and the web server are separate processes, so in-memory counters (APCu) set by a worker would always read zero on `/metrics`. The database is shared and survives restarts. The cost is one scan of `sync_runs` per scrape.
+
+Per-submission failure accounting needs a real queue worker. With `QUEUE_CONNECTION=sync`, the first failing submission aborts the command and the run is recorded as a failure.
+
+### Local stack
+
+```sh
+make metrics    # docker compose up -d --build, then prints the URLs
+make sync       # run another ojs:sync inside the app container
+make down
+```
+
+This starts the app on http://localhost:8000 (mock OJS, seeded editor and viewer accounts, one sync on startup), a queue worker, the scheduler, MySQL, Prometheus on http://localhost:9090, and Grafana on http://localhost:3000. Grafana opens with the provisioned "OJS ingestion" dashboard (`deploy/grafana/dashboards/editorial.json`) and needs no login to view.
+
+The Dockerfile and compose file are for local development only. All metrics describe the pipeline running against the bundled mock fixtures, not a live OJS journal.
+
 ## Repository layout
 
 - `app/Services/Ojs/` — OJS client (HTTP driver and fixture-backed mock driver)
@@ -122,6 +154,8 @@ php artisan tinker --execute='echo App\Models\User::where("email", "viewer@examp
 - `app/Services/Ingestion/` — upsert logic used by the ingestion jobs
 - `app/Services/Dashboard/` — stuck and overdue rules used by the API
 - `app/Http/Controllers/Api/`, `app/Http/Resources/` — JSON API controllers and response shapes
+- `app/Services/Metrics/`, `app/Models/SyncRun.php` — Prometheus exposition and the sync run audit trail
+- `deploy/prometheus/`, `deploy/grafana/`, `docker-compose.yml` — local observability stack
 - `resources/js/` — Vue dashboard: `api.js` (the only module that calls the API), `lib/` (pure date, filter, and sort helpers), `views/`, `components/`, and Vitest tests in `__tests__/`
 
 ## Roadmap / not yet done
@@ -130,8 +164,8 @@ php artisan tinker --execute='echo App\Models\User::where("email", "viewer@examp
 - Batched ingestion jobs instead of one job per submission
 - Cookie-based Sanctum SPA authentication instead of pasted tokens
 - Publication throughput view (needs publication dates, which are not stored yet)
-- Prometheus metrics and Grafana
-- Dockerfile and Compose setup
+- Alerting rules (for example on `ojs_sync_last_success_timestamp` staleness)
+- Production container image
 - Helm chart for Kubernetes / OpenShift
 - GitLab CI
 - Large synthetic dataset, load tests, and N+1 / index tuning (TODO)
