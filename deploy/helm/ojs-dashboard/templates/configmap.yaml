@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "ojs-dashboard.fullname" . }}-config
+  labels:
+    {{- include "ojs-dashboard.labels" . | nindent 4 }}
+data:
+  APP_ENV: {{ .Values.appEnv | quote }}
+  APP_URL: "http://localhost:8080"
+  APP_DEBUG: "false"
+  LOG_CHANNEL: "stderr"
+  DB_CONNECTION: "mysql"
+  DB_HOST: {{ include "ojs-dashboard.dbHost" . | quote }}
+  DB_PORT: {{ .Values.db.port | quote }}
+  DB_DATABASE: {{ .Values.db.database | quote }}
+  DB_USERNAME: {{ .Values.db.user | quote }}
+  QUEUE_CONNECTION: "database"
+  OJS_DRIVER: {{ .Values.ojs.driver | quote }}
+  OJS_BASE_URL: {{ .Values.ojs.baseUrl | quote }}
+  DASHBOARD_STUCK_DAYS: {{ .Values.dashboard.stuckDays | quote }}
+  DASHBOARD_PER_PAGE: {{ .Values.dashboard.perPage | quote }}

@@ -1,0 +1,6 @@
+apiVersion: v2
+name: ojs-dashboard
+description: OJS editorial dashboard — Laravel API + Vue SPA + MySQL + queue worker.
+type: application
+version: 0.1.0
+appVersion: "0.1"

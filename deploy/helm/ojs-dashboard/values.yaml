@@ -1,0 +1,67 @@
+replicaCount: 1
+
+# "local" so the bundled mock OJS driver may run — the app refuses APP_ENV=production
+# with the mock driver. Set to "production" together with ojs.driver=http for a real
+# journal.
+appEnv: local
+
+
+image:
+  repository: ojs-editorial-dashboard
+  tag: latest
+  pullPolicy: IfNotPresent
+
+# No Kubernetes API access: the app is not a controller and its service account
+# does not mount a token.
+serviceAccount:
+  create: true
+  automountToken: false
+
+service:
+  type: ClusterIP
+  port: 80
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  # Deliberately small: the app holds ~60-80Mi under the mock workload; 256Mi
+  # leaves headroom for php-fpm's configured pool size without wasting quota.
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+ojs:
+  driver: mock        # "http" against a real OJS 3.6 journal
+  baseUrl: ""
+
+dashboard:
+  stuckDays: 14
+  perPage: 25
+
+# Seed the two demo accounts and run one initial sync at install time.
+demo:
+  enabled: true
+
+# Bundled throwaway MySQL for local clusters. For a real database set
+# mysql.enabled=false and fill in db.host below.
+mysql:
+  enabled: true
+  image: mysql:8
+  storage: 1Gi
+
+db:
+  host: ""            # used only when mysql.enabled=false
+  port: 3306
+  database: ojs_dashboard
+  user: ojs
+
+# Values below land in a Secret. The defaults are for the bundled local stack
+# only — always override them for a shared cluster.
+secrets:
+  appKey: "base64:b2pzLWRhc2hib2FyZC1sb2NhbC1kZXYta2V5LTAwMDA="
+  dbPassword: "ojs"
+  mysqlRootPassword: "root"
+  ojsApiToken: ""
+
+syncSchedule: "0 * * * *"   # hourly ojs:sync cronjob

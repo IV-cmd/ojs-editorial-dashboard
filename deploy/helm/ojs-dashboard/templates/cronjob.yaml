@@ -1,0 +1,30 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "ojs-dashboard.fullname" . }}-sync
+  labels:
+    {{- include "ojs-dashboard.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.syncSchedule | quote }}
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            {{- include "ojs-dashboard.selectorLabels" . | nindent 12 }}
+            app.kubernetes.io/component: sync
+        spec:
+          serviceAccountName: {{ include "ojs-dashboard.fullname" . }}
+          automountServiceAccountToken: {{ .Values.serviceAccount.automountToken }}
+          {{- include "ojs-dashboard.podSecurityContext" . | nindent 10 }}
+          restartPolicy: Never
+          containers:
+            - name: sync
+              image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              args: ["ojs:sync"]
+              {{- include "ojs-dashboard.env" . | nindent 14 }}
+              {{- include "ojs-dashboard.volumeMounts" . | nindent 14 }}
+              {{- include "ojs-dashboard.containerSecurityContext" . | nindent 14 }}
+          {{- include "ojs-dashboard.writableVolumes" . | nindent 10 }}

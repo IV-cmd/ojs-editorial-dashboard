@@ -1,0 +1,80 @@
+{{- if .Values.mysql.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "ojs-dashboard.fullname" . }}-mysql
+  labels:
+    {{- include "ojs-dashboard.labels" . | nindent 4 }}
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: {{ .Values.mysql.storage }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ojs-dashboard.fullname" . }}-mysql
+  labels:
+    {{- include "ojs-dashboard.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "ojs-dashboard.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: mysql
+  template:
+    metadata:
+      labels:
+        {{- include "ojs-dashboard.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: mysql
+    spec:
+      containers:
+        - name: mysql
+          image: {{ .Values.mysql.image }}
+          ports:
+            - containerPort: 3306
+          env:
+            - name: MYSQL_DATABASE
+              value: {{ .Values.db.database | quote }}
+            - name: MYSQL_USER
+              value: {{ .Values.db.user | quote }}
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ojs-dashboard.fullname" . }}-secrets
+                  key: DB_PASSWORD
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ojs-dashboard.fullname" . }}-secrets
+                  key: MYSQL_ROOT_PASSWORD
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/mysql
+          readinessProbe:
+            exec:
+              command: ["mysqladmin", "ping", "-h", "127.0.0.1", "-u$(MYSQL_USER)", "-p$(MYSQL_PASSWORD)"]
+            initialDelaySeconds: 10
+            periodSeconds: 5
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "ojs-dashboard.fullname" . }}-mysql
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "ojs-dashboard.fullname" . }}-mysql
+  labels:
+    {{- include "ojs-dashboard.labels" . | nindent 4 }}
+spec:
+  selector:
+    {{- include "ojs-dashboard.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: mysql
+  ports:
+    - port: 3306
+      targetPort: 3306
+{{- end }}

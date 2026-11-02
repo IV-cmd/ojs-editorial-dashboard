@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "ojs-dashboard.fullname" . }}
+  labels:
+    {{- include "ojs-dashboard.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  selector:
+    {{- include "ojs-dashboard.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: web
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: http

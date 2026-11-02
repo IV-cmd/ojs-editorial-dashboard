@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ojs-dashboard.fullname" . }}-worker
+  labels:
+    {{- include "ojs-dashboard.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "ojs-dashboard.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: worker
+  template:
+    metadata:
+      labels:
+        {{- include "ojs-dashboard.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: worker
+    spec:
+      serviceAccountName: {{ include "ojs-dashboard.fullname" . }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automountToken }}
+      {{- include "ojs-dashboard.podSecurityContext" . | nindent 6 }}
+      containers:
+        - name: worker
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["queue:work", "--tries=3", "--sleep=3"]
+          {{- include "ojs-dashboard.env" . | nindent 10 }}
+          {{- include "ojs-dashboard.volumeMounts" . | nindent 10 }}
+          {{- include "ojs-dashboard.containerSecurityContext" . | nindent 10 }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- include "ojs-dashboard.writableVolumes" . | nindent 6 }}

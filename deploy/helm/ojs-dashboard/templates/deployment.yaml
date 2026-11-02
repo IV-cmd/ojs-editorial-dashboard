@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ojs-dashboard.fullname" . }}
+  labels:
+    {{- include "ojs-dashboard.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "ojs-dashboard.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: web
+  template:
+    metadata:
+      labels:
+        {{- include "ojs-dashboard.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: web
+    spec:
+      serviceAccountName: {{ include "ojs-dashboard.fullname" . }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automountToken }}
+      {{- include "ojs-dashboard.podSecurityContext" . | nindent 6 }}
+      initContainers:
+        - name: wait-migrate
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["sh", "-c", "until docker/entrypoint.sh migrate; do sleep 5; done"]
+          {{- include "ojs-dashboard.env" . | nindent 10 }}
+          {{- include "ojs-dashboard.volumeMounts" . | nindent 10 }}
+          {{- include "ojs-dashboard.containerSecurityContext" . | nindent 10 }}
+        {{- if .Values.demo.enabled }}
+        - name: demo-data
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["sh", "-c", "docker/entrypoint.sh seed && docker/entrypoint.sh sync"]
+          {{- include "ojs-dashboard.env" . | nindent 10 }}
+          {{- include "ojs-dashboard.volumeMounts" . | nindent 10 }}
+          {{- include "ojs-dashboard.containerSecurityContext" . | nindent 10 }}
+        {{- end }}
+      containers:
+        - name: app
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["serve"]
+          ports:
+            - name: http
+              containerPort: 8080
+          {{- include "ojs-dashboard.env" . | nindent 10 }}
+          {{- include "ojs-dashboard.volumeMounts" . | nindent 10 }}
+          {{- include "ojs-dashboard.containerSecurityContext" . | nindent 10 }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /up
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /up
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+      {{- include "ojs-dashboard.writableVolumes" . | nindent 6 }}
