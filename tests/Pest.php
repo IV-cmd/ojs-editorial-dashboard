@@ -1,5 +1,8 @@
 <?php
 
+use App\Services\Ojs\MockOjsClient;
+use App\Services\Ojs\OjsApiException;
+use App\Services\Ojs\OjsClientInterface;
 use Tests\TestCase;
 
 /*
@@ -46,4 +49,31 @@ expect()->extend('toBeOne', function () {
 function something()
 {
     // ..
+}
+
+/** Mock-backed client that fails the listing, or one submission's detail fetch. */
+function failingOjsClient(?int $failDetailId = null, bool $failListing = false): OjsClientInterface
+{
+    return new class(new MockOjsClient(base_path('database/fixtures/ojs')), $failDetailId, $failListing) implements OjsClientInterface
+    {
+        public function __construct(private MockOjsClient $inner, private ?int $failDetailId, private bool $failListing) {}
+
+        public function getSubmissions(): array
+        {
+            if ($this->failListing) {
+                throw new OjsApiException(503, 'upstream unavailable');
+            }
+
+            return $this->inner->getSubmissions();
+        }
+
+        public function getSubmission(int $id): array
+        {
+            if ($id === $this->failDetailId) {
+                throw new OjsApiException(500, 'detail exploded');
+            }
+
+            return $this->inner->getSubmission($id);
+        }
+    };
 }
