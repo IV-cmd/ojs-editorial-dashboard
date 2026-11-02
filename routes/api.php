@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\MetaController;
 use App\Http\Controllers\Api\SubmissionController;
+use App\Http\Controllers\Api\SyncRunController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -12,6 +13,9 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
 
     // Distinct status/context values present in the data, for the UI's filter dropdowns.
     Route::get('/meta/filters', [MetaController::class, 'filters']);
+
+    // The most recent ojs:sync run, for the dashboard's status bar.
+    Route::get('/sync-runs/latest', [SyncRunController::class, 'latest']);
 
     // Raw submission records, including reviewer IDs on assignments: editors only.
     Route::middleware('can:view-submissions')->group(function () {
