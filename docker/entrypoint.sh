@@ -20,10 +20,9 @@ case "${1:-serve}" in
         ;;
     serve)
         php artisan migrate --force
-        if [ "$(php artisan tinker --execute='echo App\Models\User::count();')" = "0" ]; then
-            # Users only: the dashboard data comes from ojs:sync against the driver.
-            php artisan db:seed --class=DemoUserSeeder --force
-        fi
+        # Idempotent (updateOrCreate): safe to run on every start. Users only —
+        # the dashboard data comes from ojs:sync against the driver.
+        php artisan db:seed --class=DemoUserSeeder --force
         php artisan ojs:sync
         php-fpm -D
         exec nginx -g 'daemon off;'

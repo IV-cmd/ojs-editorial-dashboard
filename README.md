@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/IV-cmd/ojs-editorial-dashboard/actions/workflows/ci.yml/badge.svg)](https://github.com/IV-cmd/ojs-editorial-dashboard/actions/workflows/ci.yml)
 
-A personal learning project: an operational dashboard over OJS 3.6 REST API data for editorial teams. OJS ingestion, persistence, an authenticated JSON API, a Vue dashboard over that API, and Prometheus/Grafana observability are in place; deployment tooling is still to come.
+A personal learning project: an operational dashboard over OJS 3.6 REST API data for editorial teams — OJS ingestion, persistence, an authenticated JSON API, a Vue dashboard, Prometheus/Grafana observability, and container/Kubernetes deployment.
 
 ## Status
 
@@ -14,15 +14,34 @@ A personal learning project: an operational dashboard over OJS 3.6 REST API data
 | Idempotent ingestion queue jobs (`ojs:sync`) | Done |
 | Authenticated JSON API with editor/viewer roles | Done |
 | Vue 3 dashboard (summary, stuck submissions, overdue reviews) | Done (token sign-in) |
-| Prometheus metrics, Grafana dashboard, sync run history | Done (local docker compose stack) |
-| Production image, Helm, OpenShift, GitLab CI | Not started |
+| Prometheus metrics, Grafana dashboard, sync run history | Done |
+| Production image, docker compose stack, Helm chart, GitLab CI | Done |
 | Pest / Pint / Larastan / Vitest | Configured; CI is on GitHub Actions |
 
 ### Mock mode
 
 The OJS client defaults to a fixture-backed mock driver, so the app runs with no OJS instance and no token. Set `OJS_DRIVER=http` with real credentials to talk to a live server. The production environment refuses to boot with the mock driver.
 
-## Setup
+### Architecture
+
+```mermaid
+flowchart LR
+    OJS[OJS 3.6 REST API<br/>or mock fixtures] -->|ojs:sync hourly| Sched[Scheduler]
+    Sched -->|dispatch| Q[(database queue)]
+    Q --> Worker[queue:work]
+    Worker -->|upsert per submission| MySQL[(MySQL 8)]
+    Browser[Vue 3 SPA] -->|Sanctum token| Web[nginx + PHP-FPM<br/>Laravel 12]
+    Web --> MySQL
+    Web -->|GET /metrics| Prom[Prometheus]
+    Prom --> Grafana[Grafana]
+    Browser[Vue 3 SPA] -..->|token API calls| Web
+```
+
+## Run modes
+
+Three ways to run the same application — all verified in this repo.
+
+### 1. Local PHP/Node (no containers)
 
 Requirements: PHP 8.3, Composer 2, Node.js 22, and MySQL 8. After `php artisan migrate --seed` the app ingests the bundled fixtures with `php artisan ojs:sync`.
 
@@ -37,6 +56,31 @@ php artisan serve
 
 For frontend development, use `npm run dev` instead of `npm run build`.
 
+### 2. Docker Compose (full stack, one command)
+
+```sh
+make metrics    # docker compose up -d --build, then prints the URLs
+make sync       # run another ojs:sync inside the app container
+make down
+```
+
+This starts the app on http://localhost:8000 (mock OJS, seeded editor and viewer accounts, one sync on startup), a queue worker, the scheduler, MySQL, Prometheus on http://localhost:9090, and Grafana on http://localhost:3000. Grafana opens with the provisioned "OJS ingestion" dashboard (`deploy/grafana/dashboards/editorial.json`) and needs no login to view.
+
+The same `Dockerfile` is used for compose and for Kubernetes: a multi-stage build producing a non-root (UID 10001) image running nginx + PHP-FPM on port 8080. `artisan serve` is not used in the container.
+
+### 3. Helm (Kubernetes)
+
+```sh
+make image      # docker build -t ojs-editorial-dashboard:latest .
+make deploy     # helm upgrade --install demo deploy/helm/ojs-dashboard
+```
+
+On a local `kind` cluster, load the image first (`kind load docker-image ojs-editorial-dashboard:latest`), then `helm install demo deploy/helm/ojs-dashboard`.
+
+The chart ships the web Deployment (init containers for migrate/seed/sync), a queue-worker Deployment, an hourly `ojs:sync` CronJob, Service, ServiceAccount, ConfigMap, Secret, and a throwaway bundled MySQL (set `mysql.enabled=false` and `db.host` for an external database). Defaults in `values.yaml` run mock mode.
+
+The app is not a controller: its ServiceAccount mounts no API token (`automountServiceAccountToken: false`), and pods run as UID 10001 with `readOnlyRootFilesystem` — writable dirs are `emptyDir` mounts.
+
 ## Checks
 
 ```sh
@@ -45,7 +89,10 @@ vendor/bin/pint --test
 vendor/bin/phpstan analyse
 npm test
 npm run build
+helm lint deploy/helm/ojs-dashboard && helm template demo deploy/helm/ojs-dashboard
 ```
+
+CI mirrors these on GitHub Actions (`.github/workflows/ci.yml`). `.gitlab-ci.yml` is the equivalent pipeline for a GitLab-hosted copy (stages: test, build) — it does not run on GitHub; keep the two in sync when changing checks.
 
 ## Ingestion
 
@@ -68,6 +115,7 @@ JSON endpoints under `/api`, for the dashboard frontend. Full request/response c
 | `GET /api/dashboard/summary` | any | Submission counts by status, total, stuck count, and overdue review count |
 | `GET /api/dashboard/stuck` | any | Paginated stuck submissions, plus the threshold used |
 | `GET /api/dashboard/overdue-reviews` | any | Paginated overdue review assignments |
+| `GET /api/sync-runs/latest` | any | The latest sync audit row (status, counts, duration; error text for editors only) |
 
 Roles:
 
@@ -82,7 +130,7 @@ Rules, implemented in `app/Services/Dashboard/EditorialQueries.php`:
 - **Overdue:** `date_due` before today, `date_completed` empty, and not declined or cancelled. A review due today is deliberately not overdue until the day is past: a due date is a deadline, not a violation until it is missed.
 - **Status codes:** read from OJS 3.6 source, not checked against a live server.
 
-`php artisan db:seed` creates the local demo users `editor@example.com` and `viewer@example.com` (password `password`). To issue a token:
+`php artisan db:seed --class=DemoUserSeeder` creates the local demo users `editor@example.com` and `viewer@example.com` (password `password`). To issue a token:
 
 ```sh
 php artisan tinker --execute='echo App\Models\User::where("email", "editor@example.com")->first()->createToken("local")->plainTextToken;'
@@ -135,17 +183,7 @@ The metrics are rebuilt from the database on every scrape instead of being held 
 
 Per-submission failure accounting needs a real queue worker. With `QUEUE_CONNECTION=sync`, the first failing submission aborts the command and the run is recorded as a failure.
 
-### Local stack
-
-```sh
-make metrics    # docker compose up -d --build, then prints the URLs
-make sync       # run another ojs:sync inside the app container
-make down
-```
-
-This starts the app on http://localhost:8000 (mock OJS, seeded editor and viewer accounts, one sync on startup), a queue worker, the scheduler, MySQL, Prometheus on http://localhost:9090, and Grafana on http://localhost:3000. Grafana opens with the provisioned "OJS ingestion" dashboard (`deploy/grafana/dashboards/editorial.json`) and needs no login to view.
-
-The Dockerfile and compose file are for local development only. All metrics describe the pipeline running against the bundled mock fixtures, not a live OJS journal.
+All metrics describe the pipeline running against the bundled mock fixtures, not a live OJS journal.
 
 ## Repository layout
 
@@ -155,8 +193,29 @@ The Dockerfile and compose file are for local development only. All metrics desc
 - `app/Services/Dashboard/` — stuck and overdue rules used by the API
 - `app/Http/Controllers/Api/`, `app/Http/Resources/` — JSON API controllers and response shapes
 - `app/Services/Metrics/`, `app/Models/SyncRun.php` — Prometheus exposition and the sync run audit trail
-- `deploy/prometheus/`, `deploy/grafana/`, `docker-compose.yml` — local observability stack
 - `resources/js/` — Vue dashboard: `api.js` (the only module that calls the API), `lib/` (pure date, filter, and sort helpers), `views/`, `components/`, and Vitest tests in `__tests__/`
+- `Dockerfile`, `docker/` — multi-stage image (node assets → composer vendor → php-fpm + nginx, UID 10001) and its nginx/PHP-FPM configs
+- `docker-compose.yml`, `Makefile` — local stack (app, worker, scheduler, MySQL, Prometheus, Grafana)
+- `deploy/helm/ojs-dashboard/` — Helm chart: web + worker Deployments, sync CronJob, Service, ServiceAccount, Secret, ConfigMap, optional bundled MySQL
+- `deploy/prometheus/`, `deploy/grafana/` — scrape config and provisioned dashboard
+- `.gitlab-ci.yml` — GitLab mirror of the GitHub Actions pipeline
+
+## Tested / limits
+
+Verified while building this repo:
+
+- `docker compose up` on this repo: the full stack runs in mock mode, the dashboard renders, `/metrics` is populated, and Grafana's provisioned dashboard shows live data.
+- `helm template` and `helm lint` pass; `helm install` into a `kind` cluster brings web and worker pods Ready with a completed first sync.
+- 61 Pest tests and 28 Vitest tests pass on MySQL 8; PHPStan and Pint are clean.
+
+Honest limits:
+
+- Everything above runs against the bundled mock fixtures. No live OJS 3.6 journal has been called; the `http` driver and `OJS_BASE_URL`/`OJS_API_TOKEN` path is written but unverified.
+- The image is amd64-only (built and run on linux/amd64); no multi-arch builds.
+- Secrets (`APP_KEY`, DB passwords, `OJS_API_TOKEN`) come from env/Helm values — there is no secret-management integration, and the compose file's fixed `APP_KEY` is for the local mock stack only.
+- Reviewer names are not stored anywhere (deliberate anonymity decision, see API).
+- Sanctum tokens are issued manually via `tinker` — there is no login or user-management UI.
+- The bundled MySQL in the Helm chart is a single throwaway Deployment, not a HA database.
 
 ## Roadmap / not yet done
 
@@ -165,7 +224,19 @@ The Dockerfile and compose file are for local development only. All metrics desc
 - Cookie-based Sanctum SPA authentication instead of pasted tokens
 - Publication throughput view (needs publication dates, which are not stored yet)
 - Alerting rules (for example on `ojs_sync_last_success_timestamp` staleness)
-- Production container image
-- Helm chart for Kubernetes / OpenShift
-- GitLab CI
-- Large synthetic dataset, load tests, and N+1 / index tuning (TODO)
+- OpenShift-specific notes: the chart runs under the restricted SCC defaults (non-root, no privilege escalation) but OpenShift `Route` / TLS Route templates are not included
+- Live-OJS validation, load testing with a large seeded dataset, and N+1 / index tuning
+
+## Screenshots
+
+Summary view (editor token) — sync status bar on top, cards and per-status table from `GET /api/dashboard/summary`:
+
+![Summary view](docs/screenshots/dashboard-summary.png)
+
+Overdue reviews (editor token) — the Reviewer ID column is present; a viewer token omits it entirely:
+
+![Overdue reviews](docs/screenshots/dashboard-overdue.png)
+
+Provisioned Grafana dashboard over `/metrics`:
+
+![Grafana](docs/screenshots/grafana.png)

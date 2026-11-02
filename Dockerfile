@@ -43,6 +43,8 @@ RUN rm -f /usr/local/etc/php-fpm.d/docker.conf /usr/local/etc/php-fpm.d/zz-docke
     && chown -R app:app /app/storage /app/bootstrap/cache \
     && install -d -o app -g app /run/php /run/nginx /var/log/nginx /var/lib/nginx \
     && chmod +x docker/entrypoint.sh
+# psysh and other tools write to $HOME; there is no real home dir for UID 10001.
+ENV HOME=/tmp
 USER 10001
 EXPOSE 8080
 ENTRYPOINT ["docker/entrypoint.sh"]
