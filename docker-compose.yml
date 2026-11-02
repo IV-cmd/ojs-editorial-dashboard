@@ -38,12 +38,12 @@ services:
     <<: *app
     command: serve
     ports:
-      - "8000:8000"
+      - "8000:8080"
     depends_on:
       mysql:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "php", "-r", "exit(@file_get_contents('http://127.0.0.1:8000/up') === false ? 1 : 0);"]
+      test: ["CMD", "php", "-r", "exit(@file_get_contents('http://127.0.0.1:8080/up') === false ? 1 : 0);"]
       interval: 5s
       timeout: 5s
       retries: 30
