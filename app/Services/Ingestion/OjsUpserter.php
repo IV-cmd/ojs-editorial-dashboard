@@ -26,6 +26,10 @@ class OjsUpserter
      */
     public function upsertSubmission(array $detail): Submission
     {
+        if (self::toInt($detail['id'] ?? null) === null || self::toInt($detail['contextId'] ?? null) === null) {
+            throw new InvalidOjsPayloadException('OJS submission payload is missing id or contextId.');
+        }
+
         return DB::transaction(function () use ($detail): Submission {
             $submission = Submission::updateOrCreate(
                 [
@@ -68,6 +72,10 @@ class OjsUpserter
      */
     private function upsertReviewAssignment(Submission $submission, array $assignment): void
     {
+        if (self::toInt($assignment['id'] ?? null) === null) {
+            throw new InvalidOjsPayloadException("Review assignment on OJS submission {$submission->ojs_id} is missing id.");
+        }
+
         ReviewAssignment::updateOrCreate(
             ['ojs_id' => self::toInt($assignment['id'] ?? null)],
             [

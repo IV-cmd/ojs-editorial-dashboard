@@ -2,9 +2,9 @@
 
 use App\Models\ReviewAssignment;
 use App\Models\Submission;
+use App\Services\Ingestion\InvalidOjsPayloadException;
 use App\Services\Ingestion\OjsUpserter;
 use Carbon\CarbonImmutable;
-use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -99,12 +99,12 @@ it('rolls back the whole submission when a nested review assignment is invalid',
         'id' => 2002,
         'reviewAssignments' => [
             ['id' => 9100, 'round' => 1, 'status' => 4],
-            ['round' => 1, 'status' => 4], // missing OJS id -> NOT NULL violation
+            ['round' => 1, 'status' => 4], // missing OJS id
         ],
     ]);
 
     expect(fn () => app(OjsUpserter::class)->upsertSubmission($detail))
-        ->toThrow(QueryException::class);
+        ->toThrow(InvalidOjsPayloadException::class);
 
     expect(Submission::where('ojs_id', 2002)->exists())->toBeFalse()
         ->and(ReviewAssignment::where('ojs_id', 9100)->exists())->toBeFalse();
