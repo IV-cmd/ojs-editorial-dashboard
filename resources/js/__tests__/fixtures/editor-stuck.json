@@ -1,0 +1,28 @@
+{
+  "data": [
+    {
+      "id": 1,
+      "ojs_id": 101,
+      "context_id": 1,
+      "status": 1,
+      "stage_id": 1,
+      "submission_progress": "",
+      "current_publication_id": null,
+      "date_submitted": "2022-01-03T09:00:00+00:00",
+      "date_last_activity": "2022-02-01T09:00:00+00:00",
+      "last_modified": "2022-02-01T09:00:00+00:00",
+      "review_assignments_count": 0
+    }
+  ],
+  "meta": {
+    "current_page": 1,
+    "from": 1,
+    "last_page": 1,
+    "path": "http://127.0.0.1:8011/api/dashboard/stuck",
+    "per_page": 100,
+    "to": 1,
+    "total": 1,
+    "as_of": "2026-11-02T04:43:17+00:00",
+    "stuck_threshold_days": 14
+  }
+}

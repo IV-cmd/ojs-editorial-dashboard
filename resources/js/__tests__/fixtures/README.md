@@ -1,0 +1,1 @@
+Real API responses captured from a local run against the bundled synthetic OJS fixtures (`php artisan ojs:sync`), one set per role. Paginator `links` were removed to keep the files short. `editor-*` came from an editor token and `viewer-*` from a viewer token.

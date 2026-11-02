@@ -1,0 +1,25 @@
+{
+  "data": {
+    "submissions_total": 5,
+    "submissions_by_status": [
+      {
+        "status": 1,
+        "count": 3
+      },
+      {
+        "status": 3,
+        "count": 1
+      },
+      {
+        "status": 4,
+        "count": 1
+      }
+    ],
+    "stuck_count": 1,
+    "overdue_reviews_count": 2
+  },
+  "meta": {
+    "as_of": "2026-11-02T04:43:17+00:00",
+    "stuck_threshold_days": 14
+  }
+}
