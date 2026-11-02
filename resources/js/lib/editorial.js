@@ -48,3 +48,30 @@ export function sortRows(rows, key, direction = 'asc') {
         return (left < right ? -1 : 1) * factor;
     });
 }
+
+export function relativeAge(fromIso, nowIso) {
+    if (!fromIso || !nowIso) {
+        return null;
+    }
+    const minutes = Math.floor(Math.max(0, new Date(nowIso) - new Date(fromIso)) / 60000);
+    if (minutes < 1) return 'just now';
+    if (minutes < 60) return `${minutes} min ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 48) return `${hours} h ago`;
+    return `${Math.floor(hours / 24)} days ago`;
+}
+
+export function syncStatusLine(run, nowIso) {
+    if (!run) {
+        return 'No sync has run yet.';
+    }
+    if (run.status === 'running') {
+        return `Sync running, started ${relativeAge(run.started_at, nowIso)}.`;
+    }
+
+    const failures = Object.values(run.failures ?? {}).reduce((sum, n) => sum + n, 0);
+    const outcome =
+        run.status === 'success' ? 'OK' : failures > 0 ? `FAILED (${failures} ${failures === 1 ? 'failure' : 'failures'})` : 'FAILED';
+
+    return `Last sync: ${relativeAge(run.finished_at, nowIso)}, ${run.submissions_upserted} submissions, ${run.review_assignments_upserted} review assignments, ${outcome}`;
+}

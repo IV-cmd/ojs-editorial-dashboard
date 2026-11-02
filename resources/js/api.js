@@ -58,6 +58,7 @@ export function createApiClient({ fetchImpl = (...args) => fetch(...args), stora
         user: () => get('user'),
         filters: () => get('meta/filters'),
         summary: () => get('dashboard/summary'),
+        latestSyncRun: () => get('sync-runs/latest'),
         stuck: (params = { per_page: 100 }) => get('dashboard/stuck', params),
         overdueReviews: (params = { per_page: 100 }) => get('dashboard/overdue-reviews', params),
     };

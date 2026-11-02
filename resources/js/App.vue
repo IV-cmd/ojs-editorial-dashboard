@@ -1,6 +1,7 @@
 <script setup>
 import { inject, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import SyncStatusBar from './components/SyncStatusBar.vue';
 
 const api = inject('api');
 const route = useRoute();
@@ -51,6 +52,7 @@ function signOut() {
                 <button type="button" class="text-gray-600 hover:underline" @click="signOut">Sign out</button>
             </div>
         </header>
+        <SyncStatusBar v-if="route.name && route.name !== 'login'" :key="route.fullPath" />
         <main class="mx-auto max-w-5xl px-4 py-6">
             <RouterView />
         </main>
