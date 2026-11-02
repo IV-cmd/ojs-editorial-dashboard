@@ -32,6 +32,9 @@ class SyncRun extends Model
 
     public $timestamps = false;
 
+    // Millisecond precision so durations of sub-second runs are not rounded to zero.
+    protected $dateFormat = 'Y-m-d H:i:s.v';
+
     protected $guarded = ['id'];
 
     protected function casts(): array

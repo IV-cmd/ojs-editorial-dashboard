@@ -13,8 +13,8 @@ return new class extends Migration
         Schema::create('sync_runs', function (Blueprint $table) {
             $table->id();
             $table->string('status', 16)->index();
-            $table->timestamp('started_at');
-            $table->timestamp('finished_at')->nullable();
+            $table->timestamp('started_at', 3);
+            $table->timestamp('finished_at', 3)->nullable();
             $table->unsignedInteger('submissions_listed')->default(0);
             $table->unsignedInteger('submissions_upserted')->default(0);
             $table->unsignedInteger('review_assignments_upserted')->default(0);
